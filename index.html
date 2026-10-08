@@ -74,6 +74,7 @@ pre{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,Consol
 <script>
 window.boot=function(P){const R=P.rows;
 const $=id=>document.getElementById(id);
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const HIDE=new Set(["lat","lng","Fleet"]);
 R.forEach(d=>d._s=Object.entries(d).filter(([k,v])=>!HIDE.has(k)&&v!=null).map(([,v])=>v).join(" ").toLowerCase());
 $("src").textContent=P.source+" · "+R.length.toLocaleString()+" rows";
@@ -116,7 +117,7 @@ new ResizeObserver(draw).observe(mw);
 matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
 new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 
-function bars(id,items,click){const m=Math.max(...items.map(i=>i[1]),1);$(id).innerHTML=items.map(([l,n])=>`<div class="bar" data-l="${l}"><em>${l}</em><i style="width:${n/m*60}%"></i>${n.toLocaleString()}</div>`).join("");if(click)$(id).onclick=e=>{const b=e.target.closest(".bar");if(b){$("fState").value=b.dataset.l;render()}}}
+function bars(id,items,click){const m=Math.max(...items.map(i=>i[1]),1);$(id).innerHTML=items.map(([l,n])=>`<div class="bar" data-l="${esc(l)}"><em>${esc(l)}</em><i style="width:${n/m*60}%"></i>${n.toLocaleString()}</div>`).join("");if(click)$(id).onclick=e=>{const b=e.target.closest(".bar");if(b){$("fState").value=b.dataset.l;render()}}}
 function filtered(){const w=$("q").value.toLowerCase().split(/\s+/).filter(Boolean),t=$("fType").value,s=$("fState").value,c=$("fCat").value,sc=+$("fScore").value||0,fl=+$("fFleet").value||0;
 return R.filter(d=>w.every(x=>d._s.includes(x))&&(!t||d["Aircraft Type"]==t)&&(!s||d.State==s)&&(!c||d["Rotary Category"]==c||d["Fixed-Wing Category"]==c)&&(d["Combined Score"]||0)>=sc&&d.Fleet>=fl&&(!$("fPhone").checked||d.Phone)&&(!$("fEmail").checked||d.Email))}
 function render(){cur=filtered();const n=cur.length,avg=n?Math.round(cur.reduce((a,d)=>a+(d["Combined Score"]||0),0)/n):0;
@@ -127,7 +128,7 @@ bars("bScore",[["90-100",90,101],["80-89",80,90],["70-79",70,80],["60-69",60,70]
 bars("bFleet",[["1",1,2],["2-4",2,5],["5-9",5,10],["10-24",10,25],["25-99",25,100],["100+",100,1e9]].map(([l,a,b])=>[l,cnt(d=>d.Fleet>=a&&d.Fleet<b)]));
 const sc={};cur.forEach(d=>d.State&&(sc[d.State]=(sc[d.State]||0)+1));bars("bState",Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,12),true);
 const v=d=>d[sortK]??(sortD<0?-1:"~");cur.sort((a,b)=>(v(a)>v(b)?1:v(a)<v(b)?-1:0)*sortD);
-$("tb").innerHTML=cur.slice(0,300).map((d,i)=>`<tr class="r" data-i="${i}">${COLS.map(c=>`<td>${d[c]??""}</td>`).join("")}</tr>`).join("")+(n>300?`<tr><td colspan="9">Showing 300 of ${n.toLocaleString()}. Refine filters or search.</td></tr>`:"");
+$("tb").innerHTML=cur.slice(0,300).map((d,i)=>`<tr class="r" data-i="${i}">${COLS.map(c=>`<td>${esc(d[c])}</td>`).join("")}</tr>`).join("")+(n>300?`<tr><td colspan="9">Showing 300 of ${n.toLocaleString()}. Refine filters or search.</td></tr>`:"");
 draw()}
 $("tb").onclick=e=>{const r=e.target.closest("tr.r");if(r)show(cur[+r.dataset.i])};
 function show(d){$("rec").textContent=P.columns.filter(c=>d[c]!=null).map(c=>c+": "+d[c]).join("\n");$("dlg").style.display="flex"}
