@@ -1,0 +1,173 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12161b"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="AV Matrix"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>AV Master Matrix Dashboard</title>
+<style>
+/* Layout: sticky search header, stat cards, filters, map + charts, sortable table; tap any row or dot for a text record */
+:root{--bg:#f4f6f8;--card:#ffffff;--tx:#17202a;--mu:#5d6b7a;--ac:#2563eb;--bd:#dde2e8;--map:#e9eef3;--good:#16a34a;--ok:#ca8a04;--mid:#ea580c;--low:#dc2626}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161b;--card:#1b2027;--tx:#e6e9ed;--mu:#8e9aa8;--ac:#6ea0ff;--bd:#2a313a;--map:#0e1216;--good:#22c55e;--ok:#eab308;--mid:#f97316;--low:#ef4444;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161b;--card:#1b2027;--tx:#e6e9ed;--mu:#8e9aa8;--ac:#6ea0ff;--bd:#2a313a;--map:#0e1216;--good:#22c55e;--ok:#eab308;--mid:#f97316;--low:#ef4444;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,sans-serif;padding-inline:16px;padding-block:0 24px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+h1{font-size:16px;margin:0;white-space:nowrap}
+input,select,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;min-width:0}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+#q{flex:1 1 220px}
+#src{color:var(--mu);font-size:12px;width:100%}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-block:8px}
+.card,.panel{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.card b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.card span{color:var(--mu);font-size:12px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-block:10px}
+.filters label{display:flex;gap:6px;align-items:center}
+.filters input[type=number]{width:72px}
+.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+h3{margin:0 0 8px;font-size:13px}
+#mapw{position:relative;height:min(62vh,560px);background:var(--map);border-radius:6px;overflow:hidden;touch-action:none}
+#cv{display:block;width:100%;height:100%}
+#zb{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:4px}
+#zb button{width:34px;height:34px;padding:0;font-size:18px}
+#tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:3px 7px;font-size:12px;display:none}
+.legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--mu);font-size:12px;margin-top:6px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.bar{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px;font-variant-numeric:tabular-nums}.bar i{display:block;height:12px;background:var(--ac);border-radius:3px;min-width:2px}.bar em{width:56px;font-style:normal;color:var(--mu);flex:none}
+#bState .bar{cursor:pointer}
+.tw{max-height:560px;overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+th{cursor:pointer;color:var(--mu);font-size:12px;position:sticky;top:0;background:var(--card)}
+tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:20;align-items:center;justify-content:center;padding:16px}
+#dlg>div{background:var(--card);max-width:760px;width:100%;max-height:88vh;overflow:auto;border-radius:10px;padding:16px}
+pre{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,Consolas,monospace;margin:0}
+</style><style>
+#lock{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+#lock[hidden]{display:none}
+#lock form{width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px}
+#lock h2{margin:0;font-size:20px}#lock p{margin:0;color:var(--mu)}
+#lock input,#lock button{padding:12px;font-size:16px}
+#lock button{background:var(--ac);color:var(--bg);border-color:var(--ac);font-weight:600}
+#lerr{color:var(--low);min-height:1.2em}
+#ban{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--card);border:1px solid var(--ac);border-radius:8px;padding:10px 12px;display:none;cursor:pointer}
+</style></head><body>
+<div id="lock"><form id="lf"><h2>AV Master Matrix</h2><p>Enter the passphrase to unlock the data. You only need to do this once on this device.</p>
+<input id="pw" type="password" autocomplete="current-password" placeholder="Passphrase" aria-label="Passphrase"><button id="go" type="submit">Unlock</button><div id="lerr" role="alert"></div></form></div>
+<div id="ban"></div>
+<header><h1>AV Master Matrix</h1><input id="q" type="search" placeholder="Search anything: name, city, N-number, notes"><span id="src"></span></header>
+<div class="cards" id="cards"></div>
+<div class="filters">
+<select id="fType"><option value="">All types</option></select>
+<select id="fState"><option value="">All states</option></select>
+<select id="fCat"><option value="">All categories</option></select>
+<label>Score ≥ <input id="fScore" type="number" min="0" max="100" value="0"></label>
+<label>Fleet ≥ <input id="fFleet" type="number" min="0" value="0"></label>
+<label><input type="checkbox" id="fPhone"> phone</label><label><input type="checkbox" id="fEmail"> email</label>
+<button id="reset">Reset</button><span id="cnt" style="color:var(--mu)"></span>
+</div>
+<div class="grid">
+<div class="panel"><h3>Map: dot size = fleet, color = score</h3>
+<div id="mapw"><canvas id="cv"></canvas><div id="zb"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" style="font-size:12px">⌂</button></div><div id="tip"></div></div>
+<div class="legend"><span><i style="background:var(--good)"></i>70+</span><span><i style="background:var(--ok)"></i>50–69</span><span><i style="background:var(--mid)"></i>35–49</span><span><i style="background:var(--low)"></i>under 35</span><span>Drag to pan, tap a dot for the record</span></div></div>
+<div class="panel"><h3>Score</h3><div id="bScore"></div><h3 style="margin-top:12px">Fleet size</h3><div id="bFleet"></div><h3 style="margin-top:12px">Top states (tap to filter)</h3><div id="bState"></div></div>
+</div>
+<div class="panel"><div class="tw"><table><thead><tr id="thead"></tr></thead><tbody id="tb"></tbody></table></div></div>
+<div id="dlg"><div><button id="dx" style="float:right">Close</button><pre id="rec"></pre></div></div>
+<script>
+window.boot=function(P){const R=P.rows;
+const $=id=>document.getElementById(id);
+const HIDE=new Set(["lat","lng","Fleet"]);
+R.forEach(d=>d._s=Object.entries(d).filter(([k,v])=>!HIDE.has(k)&&v!=null).map(([,v])=>v).join(" ").toLowerCase());
+$("src").textContent=P.source+" · "+R.length.toLocaleString()+" rows";
+const uniq=k=>[...new Set(R.map(d=>d[k]).filter(Boolean))].sort();
+uniq("Aircraft Type").forEach(v=>$("fType").add(new Option(v,v)));
+uniq("State").forEach(v=>$("fState").add(new Option(v,v)));
+[...new Set(R.flatMap(d=>[d["Rotary Category"],d["Fixed-Wing Category"]]).filter(Boolean))].sort().forEach(v=>$("fCat").add(new Option(v,v)));
+const COLS=["Rank","Company Name","Aircraft Type","Combined Score","City","State","Fleet","Phone","Email"];
+let sortK="Combined Score",sortD=-1,cur=[];
+$("thead").innerHTML=COLS.map(c=>`<th data-k="${c}">${c}</th>`).join("");
+$("thead").onclick=e=>{const k=e.target.dataset.k;if(!k)return;sortD=sortK==k?-sortD:-1;sortK=k;render()};
+
+/* map: own canvas, no tiles (artifact pages cannot load external images) */
+const cv=$("cv"),ctx=cv.getContext("2d"),mw=$("mapw");
+const LAT0=24,LAT1=50,LNG0=-125,LNG1=-66,KX=Math.cos(38*Math.PI/180);
+let W=0,H=0,k=1,ox=0,oy=0,pts=[];
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const scol=s=>cssv(s>=70?"--good":s>=50?"--ok":s>=35?"--mid":"--low");
+function base(){const sx=W/((LNG1-LNG0)*KX),sy=H/(LAT1-LAT0);return Math.min(sx,sy)}
+function proj(lat,lng){const b=base()*k,bw=(LNG1-LNG0)*KX*base(),bh=(LAT1-LAT0)*base();
+return[(lng-LNG0)*KX*b+ox+(W-bw)/2,(LAT1-lat)*b+oy+(H-bh)/2]}
+function draw(){const dpr=devicePixelRatio||1;W=mw.clientWidth;H=mw.clientHeight;if(!W)return;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+ctx.clearRect(0,0,W,H);ctx.strokeStyle=cssv("--bd");ctx.lineWidth=.5;ctx.beginPath();
+for(let lng=-120;lng<=-70;lng+=10){const[x]=proj(30,lng);ctx.moveTo(x,0);ctx.lineTo(x,H)}
+for(let lat=25;lat<=50;lat+=5){const[,y]=proj(lat,-100);ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
+pts=[];const list=cur.filter(d=>d.lat&&d.lat>=LAT0&&d.lat<=LAT1&&d.lng>=LNG0&&d.lng<=LNG1).sort((a,b)=>(a["Combined Score"]||0)-(b["Combined Score"]||0));
+ctx.globalAlpha=.6;for(const d of list){const[x,y]=proj(d.lat,d.lng);if(x<-10||y<-10||x>W+10||y>H+10)continue;const r=Math.min(2+Math.sqrt(d.Fleet)*.7,11)*Math.min(1+(k-1)*.15,2);
+ctx.fillStyle=scol(d["Combined Score"]||0);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();pts.push([x,y,r,d])}ctx.globalAlpha=1}
+function zoom(f,cx=W/2,cy=H/2){const nk=Math.max(1,Math.min(40,k*f));f=nk/k;ox=(ox+(cx-W/2))*f-(cx-W/2);oy=(oy+(cy-H/2))*f-(cy-H/2);k=nk;draw()}
+$("zi").onclick=()=>zoom(1.6);$("zo").onclick=()=>zoom(1/1.6);$("zr").onclick=()=>{k=1;ox=oy=0;draw()};
+cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoom(e.deltaY<0?1.25:.8,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+let drag=null,moved=0;
+cv.onpointerdown=e=>{drag=[e.clientX,e.clientY];moved=0;cv.setPointerCapture(e.pointerId)};
+cv.onpointermove=e=>{const r=cv.getBoundingClientRect();
+if(drag){const dx=e.clientX-drag[0],dy=e.clientY-drag[1];moved+=Math.abs(dx)+Math.abs(dy);ox+=dx;oy+=dy;drag=[e.clientX,e.clientY];draw();return}
+const h=hit(e.clientX-r.left,e.clientY-r.top);const t=$("tip");if(h){t.textContent=h["Company Name"];t.style.display="block";t.style.left=Math.min(e.clientX-r.left+10,W-150)+"px";t.style.top=(e.clientY-r.top+10)+"px"}else t.style.display="none"};
+cv.onpointerup=e=>{drag=null;if(moved<6){const r=cv.getBoundingClientRect();const h=hit(e.clientX-r.left,e.clientY-r.top);if(h)show(h)}};
+function hit(x,y){let best=null,bd=1e9;for(let i=pts.length-1;i>=0;i--){const[px,py,r,d]=pts[i],dd=(px-x)**2+(py-y)**2,lim=Math.max(r,8)**2;if(dd<lim&&dd<bd){bd=dd;best=d}}return best}
+new ResizeObserver(draw).observe(mw);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+function bars(id,items,click){const m=Math.max(...items.map(i=>i[1]),1);$(id).innerHTML=items.map(([l,n])=>`<div class="bar" data-l="${l}"><em>${l}</em><i style="width:${n/m*60}%"></i>${n.toLocaleString()}</div>`).join("");if(click)$(id).onclick=e=>{const b=e.target.closest(".bar");if(b){$("fState").value=b.dataset.l;render()}}}
+function filtered(){const w=$("q").value.toLowerCase().split(/\s+/).filter(Boolean),t=$("fType").value,s=$("fState").value,c=$("fCat").value,sc=+$("fScore").value||0,fl=+$("fFleet").value||0;
+return R.filter(d=>w.every(x=>d._s.includes(x))&&(!t||d["Aircraft Type"]==t)&&(!s||d.State==s)&&(!c||d["Rotary Category"]==c||d["Fixed-Wing Category"]==c)&&(d["Combined Score"]||0)>=sc&&d.Fleet>=fl&&(!$("fPhone").checked||d.Phone)&&(!$("fEmail").checked||d.Email))}
+function render(){cur=filtered();const n=cur.length,avg=n?Math.round(cur.reduce((a,d)=>a+(d["Combined Score"]||0),0)/n):0;
+const cnt=f=>cur.filter(f).length;
+$("cards").innerHTML=[["Operators",n],["Avg score",avg],["Rotary",cnt(d=>/Rotary/.test(d["Aircraft Type"]))],["Fixed wing",cnt(d=>/Fixed/.test(d["Aircraft Type"]))],["Total fleet",cur.reduce((a,d)=>a+d.Fleet,0)],["Has phone",cnt(d=>d.Phone)],["Has email",cnt(d=>d.Email)],["Mapped",cnt(d=>d.lat)]].map(([l,v])=>`<div class="card"><b>${v.toLocaleString()}</b><span>${l}</span></div>`).join("");
+$("cnt").textContent=n.toLocaleString()+" shown";
+bars("bScore",[["90-100",90,101],["80-89",80,90],["70-79",70,80],["60-69",60,70],["40-59",40,60],["<40",-1,40]].map(([l,a,b])=>[l,cnt(d=>{const s=d["Combined Score"]||0;return s>=a&&s<b})]));
+bars("bFleet",[["1",1,2],["2-4",2,5],["5-9",5,10],["10-24",10,25],["25-99",25,100],["100+",100,1e9]].map(([l,a,b])=>[l,cnt(d=>d.Fleet>=a&&d.Fleet<b)]));
+const sc={};cur.forEach(d=>d.State&&(sc[d.State]=(sc[d.State]||0)+1));bars("bState",Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,12),true);
+const v=d=>d[sortK]??(sortD<0?-1:"~");cur.sort((a,b)=>(v(a)>v(b)?1:v(a)<v(b)?-1:0)*sortD);
+$("tb").innerHTML=cur.slice(0,300).map((d,i)=>`<tr class="r" data-i="${i}">${COLS.map(c=>`<td>${d[c]??""}</td>`).join("")}</tr>`).join("")+(n>300?`<tr><td colspan="9">Showing 300 of ${n.toLocaleString()}. Refine filters or search.</td></tr>`:"");
+draw()}
+$("tb").onclick=e=>{const r=e.target.closest("tr.r");if(r)show(cur[+r.dataset.i])};
+function show(d){$("rec").textContent=P.columns.filter(c=>d[c]!=null).map(c=>c+": "+d[c]).join("\n");$("dlg").style.display="flex"}
+$("dx").onclick=()=>$("dlg").style.display="none";
+$("dlg").onclick=e=>{if(e.target==$("dlg"))$("dlg").style.display="none"};
+document.querySelectorAll("select,input").forEach(el=>el.oninput=render);
+$("reset").onclick=()=>{document.querySelectorAll(".filters select").forEach(s=>s.value="");$("q").value="";$("fScore").value=0;$("fFleet").value=0;$("fPhone").checked=$("fEmail").checked=false;render()};
+render();
+};
+</script>
+
+<script>
+(()=>{const $=id=>document.getElementById(id);
+const idb=(()=>{let p;const open=()=>p||(p=new Promise((res,rej)=>{const r=indexedDB.open("avm",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
+const tx=async(m,f)=>{const db=await open();return new Promise((res,rej)=>{const t=db.transaction("kv",m),q=f(t.objectStore("kv"));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)})};
+return{get:k=>tx("readonly",s=>s.get(k)),set:(k,v)=>tx("readwrite",s=>s.put(v,k)),clear:()=>tx("readwrite",s=>s.clear())}})();
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const derive=async(pass,salt)=>{const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["decrypt"])};
+const unseal=async(key,buf)=>{const b=new Uint8Array(buf);const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},key,b.slice(12));
+return new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream("gzip"))).json()};
+const getVer=async()=>{const r=await fetch("version.json",{cache:"no-store"});if(!r.ok)throw new Error("nodata");return r.json()};
+const getData=async()=>{const r=await fetch("data.enc",{cache:"no-store"});if(!r.ok)throw new Error("nodata");return r.arrayBuffer()};
+const ban=(t,f)=>{const b=$("ban");b.textContent=t;b.style.display="block";b.onclick=f};
+let booted=false;
+const go=p=>{if(booted)return;booted=true;$("lock").hidden=true;window.boot(p);
+const f=document.createElement("button");f.textContent="Forget data on this device";f.style.cssText="margin-left:8px;font-size:12px;padding:3px 8px";
+f.onclick=async()=>{await idb.clear();location.reload()};$("src").appendChild(f)};
+async function refresh(key,v){try{const ver=await getVer();if(ver.v===v)return;const buf=await getData();
+try{const payload=await unseal(key,buf);await idb.set("data",{v:ver.v,payload});ban("New data is ready. Tap to refresh.",()=>location.reload())}
+catch{await idb.clear();ban("The passphrase changed. Tap to unlock again.",()=>location.reload())}}catch{}}
+$("lf").onsubmit=async e=>{e.preventDefault();const err=$("lerr");err.textContent="";$("go").disabled=true;
+try{const ver=await getVer(),buf=await getData();const key=await derive($("pw").value,b64(ver.salt));let payload;
+try{payload=await unseal(key,buf)}catch{throw new Error("pass")}
+try{await idb.set("key",key);await idb.set("data",{v:ver.v,payload})}catch{}
+go(payload)}catch(x){err.textContent=x.message==="pass"?"Wrong passphrase.":x.message==="nodata"?"No data has been published yet, or you are offline.":"Could not unlock. Check your connection."}
+$("go").disabled=false};
+(async()=>{let c,k;try{c=await idb.get("data");k=await idb.get("key")}catch{}
+if(c){go(c.payload);if(k)refresh(k,c.v)}})();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body></html>
